@@ -6,6 +6,9 @@
 #include "My_Headers\txt_files.h"
 
 #define MIPT_FORMAT " \"%[^\"]\" "
+const char BEGIN_SEPARATOR = '{';
+const char END_SEPARATOR = '}';
+const char VALUE_SEPARATOR[] = "\"";
 
 struct Phrase {
     char* phrase;
@@ -20,56 +23,58 @@ bool operator<(Phrase a, Phrase b) {
 const char DATA_BASE[] = "Test.txt";
 const size_t PHRASE_LENGTH = 1000;
 
+//Специализация методов класса, для корректной работы с фразами.
 template <>
 void Tree<Phrase>::valueDestruct() {
     value.phrase = nullptr;
 }
 template <>
 void Tree<Phrase>::valuePrint(FILE *file) {
-    fprintf(file, "%s", value.phrase);
+    fprintf(file, "%s" , value.phrase);
 }
 
-char* readNode(char* ptr, Tree<Phrase>* node, size_t index) {
-    ptr = strchr(ptr, '{') + 1;
-    char phrase[PHRASE_LENGTH] = "";
-    int length = 0;
-    sscanf(ptr, MIPT_FORMAT "%n", phrase, &length);
-    ptr += length;
-    if (node == nullptr) {
-        node = new Tree<Phrase>({phrase});
-        if (strchr(ptr, '{') != nullptr && strchr(ptr, '{') < strchr(ptr, '}')) {
-            ptr = readNode(strchr(ptr, '{'), node, LEFT_CHILD);
-            ptr = readNode(strchr(ptr, '{'), node, RIGHT_CHILD);
-        }
-    } else {
-        node->growChild(index, {phrase});
-        if (strchr(ptr, '{') != nullptr && strchr(ptr, '{') < strchr(ptr, '}')) {
-            ptr = readNode(strchr(ptr, '{'), node->getChild(index), LEFT_CHILD);
-            ptr = readNode(strchr(ptr, '{'), node->getChild(index), RIGHT_CHILD);
-        }
-    }
-    ptr = strchr(ptr, '}');
-    return ptr;
-}
-
-Tree<Phrase>* parser() {
-    size_t length = 0;
-    char* buffer = read_file_to_buffer_alloc(DATA_BASE, "r", &length);
-    char* ptr = buffer;
-    Tree<Phrase>* node = nullptr;
-    readNode(ptr, node, 0);
-    return node;
-}
+char* readNode(char* ptr, Tree<Phrase>* node);
+Tree<Phrase>* parse(char** buff);
 
 int main() {
     SetConsoleOutputCP(CP_UTF8);
-    Tree<Phrase>* ackinator = parser();
-    Tree<Phrase>** preorder = (Tree<Phrase>**)calloc(ackinator->getSize(), sizeof(preorder[0]));
-    ackinator->preorder(preorder);
-    for (int i = 0; i < ackinator->getSize(); ++i) {
-        preorder[i]->valuePrint(stdout);
-        printf(" ");
-    }
+    FILE* log = fopen64(TREE_LOG_NAME, "wb"); //clearing log file
+    fclose(log);
+
+    char* buffer = nullptr;
+    Tree<Phrase>* ackinator = parse(&buffer);
+    ackinator->treeVerify(__FILE__, __PRETTY_FUNCTION__, __LINE__);
+
     delete (ackinator);
+    free(buffer);
     return 0;
+}
+
+Tree<Phrase>* parse(char** buff) {
+    size_t length = 0;
+    char* buffer = read_file_to_buffer_alloc(DATA_BASE, "r", &length);
+    Tree<Phrase>* node = new Tree<Phrase>({nullptr});
+    readNode(buffer, node);
+    *buff = buffer;
+    return node;
+}
+
+char *readNode(char *ptr, Tree<Phrase> *node) { //format { "quest" { "answer" }{ "answer" }}   //RIGHT - no, LEFT - YES
+    assert(node);
+    assert(ptr);
+    ptr = strchr(ptr, *VALUE_SEPARATOR);
+    node->setValue({strtok(ptr, VALUE_SEPARATOR)});
+    ptr = strchr(ptr, '\0') + 1;
+    while (strchr(ptr, BEGIN_SEPARATOR) != nullptr && strchr(ptr, BEGIN_SEPARATOR) < strchr(ptr, END_SEPARATOR)) {
+        ptr = strchr(ptr, BEGIN_SEPARATOR);
+        for (int i = 0; i < NUMBER_OF_CHILDREN; ++i) {
+            if (node->getChild(i) == (Tree<Phrase>*)node->NIL) {
+                node->growChild(i, {nullptr});
+                ptr = readNode(ptr, node->getChild(i)) + 1;
+                break;
+            }
+        }
+    }
+    ptr = strchr(ptr, END_SEPARATOR);
+    return ptr;
 }
