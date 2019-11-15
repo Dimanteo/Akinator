@@ -1,7 +1,6 @@
 #include <windows.h>
 
 #define OK_DUMP
-#define DO_GRAPH
 #include "Tree_t\Tree.cpp"
 #include "My_Headers\txt_files.h"
 
@@ -34,7 +33,10 @@ void Tree<Phrase>::valuePrint(FILE *file) {
 }
 
 char* readNode(char* ptr, Tree<Phrase>* node);
+
 Tree<Phrase>* parse(char** buff);
+
+void printDatabase(Tree<Phrase>* node, FILE* stream);
 
 int main() {
     SetConsoleOutputCP(CP_UTF8);
@@ -42,10 +44,16 @@ int main() {
     fclose(log);
 
     char* buffer = nullptr;
-    Tree<Phrase>* ackinator = parse(&buffer);
-    ackinator->treeVerify(__FILE__, __PRETTY_FUNCTION__, __LINE__);
+    Tree<Phrase>* akinator = parse(&buffer);
+    Tree<Phrase>** seq = (Tree<Phrase>**)calloc(akinator->getSize(), sizeof(seq[0]));
+    akinator->inorder(seq);
+    akinator->graphDump("Graph.png", seq);
+    printDatabase(akinator, stdout);
+    FILE* data_base = fopen("DATA_BASE.txt", "wb");
+    printDatabase(akinator, data_base);
+    fclose(data_base);
 
-    delete (ackinator);
+    delete (akinator);
     free(buffer);
     return 0;
 }
@@ -77,4 +85,17 @@ char *readNode(char *ptr, Tree<Phrase> *node) { //format { "quest" { "answer" }{
     }
     ptr = strchr(ptr, END_SEPARATOR);
     return ptr;
+}
+
+void printDatabase(Tree<Phrase>* node, FILE *stream) {
+    fprintf(stream, "%c %c", BEGIN_SEPARATOR, *VALUE_SEPARATOR);
+    node->valuePrint(stream);
+    fprintf(stream, "%c ", *VALUE_SEPARATOR);
+    if (node->getChild(LEFT_CHILD) != (Tree<Phrase>*)node->NIL) {
+        printDatabase(node->getChild(LEFT_CHILD), stream);
+    }
+    if (node->getChild(RIGHT_CHILD) != (Tree<Phrase>*)node->NIL) {
+        printDatabase(node->getChild(RIGHT_CHILD), stream);
+    }
+    fprintf(stream, "%c", END_SEPARATOR);
 }
