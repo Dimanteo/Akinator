@@ -1,4 +1,5 @@
 #include <windows.h>
+#include <cmath>
 
 #define OK_DUMP
 #include "Tree_t\Tree.cpp"
@@ -68,10 +69,15 @@ void printDatabase(Tree<Phrase>* node, FILE* stream);
 
 void play (Tree<Phrase>* akinator, FILE* in, FILE* out);
 
-void comparision(Phrase first, Phrase second);
+bool findCollision(Tree<Phrase> *akinator, const char *phrase, FILE *in, FILE* out);
 
 void newAnswer(Tree<Phrase>* mistake, FILE* in, FILE* out);
 
+char *definition(Tree<Phrase> **path, size_t num);
+
+Tree<Phrase>* seek(Tree<Phrase>* akinator, const char* phrase);
+
+Tree<Phrase>** getPath(Tree<Phrase>* node, size_t* num);
 
 int main() {
     FILE* log = fopen(TREE_LOG_NAME, "wb"); //clearing log file
@@ -145,6 +151,11 @@ void newAnswer (Tree<Phrase>* mistake, FILE* in, FILE* out) {
     fprintf(out, "A kakov pravilniy otvet?\n");
     char correct[ANSWER_SIZE] = "";
     fscanf(in, "%s", correct);
+
+    if (findCollision(mistake, correct, in, out)) {
+        return;
+    }
+
     fprintf(out, "Seriously? Chem %s otlichaetsya ot ", correct);
     mistake->valuePrint(out);
     fprintf(out, "\n");
@@ -205,4 +216,86 @@ void play (Tree<Phrase>* akinator, FILE* in, FILE* out) {
     //Блок обработки ошибок
     fprintf(out, "Ne hotite po horoshemu, budet po plohomu...\nInitializing Skynet = new Task->Kill_All_Humans\n");
     abort();
+}
+
+bool findCollision(Tree<Phrase> *akinator, const char *phrase, FILE *in, FILE* out) {
+    assert(akinator);
+    assert(in);
+    assert(out);
+
+    Tree<Phrase>* copy = seek(akinator->getRoot(), phrase);
+    if (copy != nullptr) {
+        size_t size = 0;
+        Tree<Phrase>** path = getPath(copy, &size);
+        char* def = definition(path, size);
+        free(path);
+        fprintf(out, "Ne pravda. Ya uzhe znau %s\n%s.", phrase, def);
+        free(def);
+        return true;
+    }
+    return false;
+}
+
+char *definition(Tree<Phrase> **path, size_t num) {
+    assert(path);
+
+    size_t len = 0;
+
+    for (int i = 0; i < num; ++i) {
+        len += strlen(path[i]->getValue().phrase) + 4;
+    }
+    char* output = (char*) calloc(len + 2, sizeof(output[0]));
+    assert(output);
+    strcpy(output, path[num - 1]->getValue().phrase);
+    strcat(output, " eto ");
+    for (int i = 0; i < num - 1; ++i) {
+        if (path[i]->getChild(RIGHT_CHILD) == path[i + 1]) {
+            strcat(output, "ne ");
+        }
+        path[i]->getValue().phrase[strlen(path[i]->getValue().phrase) - 1] = ' ';
+        strcat(output, path[i]->getValue().phrase);
+        path[i]->getValue().phrase[strlen(path[i]->getValue().phrase) - 1] = '?';
+        strcat(output, " ");
+    }
+    return output;
+}
+
+Tree<Phrase> *seek(Tree<Phrase> *akinator, const char *phrase) {
+    assert(akinator);
+    assert(phrase);
+
+    Tree<Phrase>** nodes = akinator->allocTree();
+    akinator->inorder(nodes);
+    for (int i = 0; i < akinator->getSize(); ++i) {
+        if (strcmp(phrase, nodes[i]->getValue().phrase) == 0) {
+            Tree<Phrase>* ret_val = nodes[i];
+            free(nodes);
+            return ret_val;
+        }
+    }
+    free(nodes);
+    return nullptr;
+}
+
+Tree<Phrase>** getPath(Tree<Phrase>* node, size_t* num) {
+    assert(node);
+
+    Tree<Phrase>** rpath = (Tree<Phrase>**)calloc( ceil(log(node->getSize()) / log(2)), sizeof(rpath[0]));
+    assert(rpath);
+    *num = 0;
+
+    while(node != nullptr) {
+        rpath[*num] = node;
+        *num += 1;
+        node = node->getParent();
+    }
+
+    Tree<Phrase>** path = (Tree<Phrase>**)calloc( *num, sizeof(path[0]));
+    assert(path);
+    for (int i = 0; i < *num; ++i) {
+        path[i] = rpath[*num - i - 1];
+    }
+    free(rpath);
+
+    return path;
 }
