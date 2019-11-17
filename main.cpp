@@ -79,26 +79,16 @@ Tree<Phrase>* seek(Tree<Phrase>* akinator, const char* phrase);
 
 Tree<Phrase>** getPath(Tree<Phrase>* node, size_t* num);
 
+void compare(Tree<Phrase>* akinator, FILE* in, FILE* out);
+
 int main() {
     FILE* log = fopen(TREE_LOG_NAME, "wb"); //clearing log file
     fclose(log);
 
     char* buffer = nullptr;
     Tree<Phrase>* akinator = parse(&buffer);
-    size_t inputSize = akinator->getSize();
-    Tree<Phrase>** seq = akinator->allocTree();
-    akinator->inorder(seq);
-    akinator->graphDump("Graph.png", seq);
 
-    play(akinator, stdin, stdout);
-    printf("\n");
-
-    akinator->inorder(seq);
-    akinator->graphDump("Graph.png", seq);
-    printDatabase(akinator, stdout);
-    FILE* data_base = fopen(DATA_BASE_OUTPUT, "wb");
-    printDatabase(akinator, data_base);
-    fclose(data_base);
+    compare(akinator, stdin, stdout);
 
     delete (akinator);
     free(buffer);
@@ -298,4 +288,56 @@ Tree<Phrase>** getPath(Tree<Phrase>* node, size_t* num) {
     free(rpath);
 
     return path;
+}
+
+void compare(Tree<Phrase> *akinator, FILE *in, FILE *out) {
+    fprintf(out, "Chto mne sravnit: \n");
+    char in_first[ANSWER_SIZE] = "";
+    char in_second[ANSWER_SIZE] = "";
+    fscanf(in, "%s %s", in_first, in_second);
+    Tree<Phrase>* first = seek(akinator, in_first);
+    if (first == nullptr) {
+        fprintf(out, "Ya ne znau %s", in_first);
+        return;
+    }
+    Tree<Phrase>* second = seek(akinator, in_second);
+    if (second == nullptr) {
+        fprintf(out, "Ya ne znau %s", in_second);
+        return;
+    }
+    size_t size1 = 0, size2 = 0;
+    Tree<Phrase>** path1 = getPath(first, &size1);
+    Tree<Phrase>** path2 = getPath(second, &size2);
+
+    //общее поддерево
+    int index = 0;
+    if (path1[1] == path2[1]) {
+        fprintf(out, "%s and %s pohozhi tem, chto oni oba", first->getValue().phrase, second->getValue().phrase);
+        for (; path1[index + 1] == path2[index + 1]; ++index) {
+            if (path1[index]->getChild(RIGHT_CHILD) == path1[index + 1] &&
+                path2[index]->getChild(RIGHT_CHILD) == path2[index + 1])
+                fprintf(out, " ne");
+            fprintf(out, " %s", path1[index]->getValue().phrase);
+        }
+        fprintf(out, ", no ");
+    }
+    //личные поддеревья
+    fprintf(out, "%s", first->getValue().phrase);
+    for (int i = index; i < size1 - 1; ++i) {
+        if (path1[i]->getChild(RIGHT_CHILD) == path1[i + 1])
+            fprintf(out, " ne");
+        path1[i]->getValue().phrase[strlen(path1[i]->getValue().phrase) - 1] = ' ';
+        fprintf(out, " %s", path1[i]->getValue().phrase);
+        path1[i]->getValue().phrase[strlen(path1[i]->getValue().phrase) - 1] = '?';
+    }
+    fprintf(out, ", a %s", second->getValue().phrase);
+    for (int i = index; i < size2 - 1; ++i) {
+        if (path2[i]->getChild(RIGHT_CHILD) == path2[i + 1])
+            fprintf(out, " ne");
+        path2[i]->getValue().phrase[strlen(path2[i]->getValue().phrase) - 1] = ' ';
+        fprintf(out, " %s", path2[i]->getValue().phrase);
+        path2[i]->getValue().phrase[strlen(path2[i]->getValue().phrase) - 1] = '?';
+    }
+    free(path1);
+    free(path2);
 }
