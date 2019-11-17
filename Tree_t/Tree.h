@@ -45,6 +45,8 @@ public:
 
     Tree<T>* getParent();
 
+    bool isRoot();
+
     size_t getSize();
 
     Tree<T>* getRoot();
@@ -56,8 +58,11 @@ public:
 
     Tree<T>* growChild(size_t index, T value);
     void removeSubTree(size_t index);
+    bool childIsEmpty(size_t index);
 
     Tree<T>* put(T _value);
+
+    Tree<T>** allocTree();
 
     Tree<T>** preorder(Tree<T>** sequence);
 

@@ -41,7 +41,7 @@ template <class T>
 Tree<T>::~Tree() {
     treeVerify(VERIFY_CONTEXT);
     for (int i = 0; i < NUMBER_OF_CHILDREN; ++i) {
-        if (getChild(i) != NIL) {
+        if (!childIsEmpty(i)) {
             delete(getChild(i));
             setChild(i, (Tree<T>*)NIL);
         }
@@ -49,7 +49,7 @@ Tree<T>::~Tree() {
     free(this->children);
     this->children = nullptr;
     decSize();
-    if (parent == nullptr){
+    if (isRoot()){
         free(size);
     }
     size = nullptr;
@@ -78,6 +78,11 @@ Tree<T>* Tree<T>::getChild(size_t index) {
 }
 
 template <class T>
+bool Tree<T>::childIsEmpty(size_t index) {
+    return getChild(index) == (Tree<T>*)NIL;
+}
+
+template <class T>
 void Tree<T>::setChild(size_t index, Tree<T> *node) {
     children[index] = node;
 }
@@ -85,7 +90,7 @@ void Tree<T>::setChild(size_t index, Tree<T> *node) {
 template <class T>
 Tree<T>* Tree<T>::growChild(size_t index, T _value){
     treeVerify(VERIFY_CONTEXT);
-    if (getChild(index) == (Tree<T>*)NIL) {
+    if (childIsEmpty(index)) {
         setChild(index, new Tree<T>(_value, this));
         treeVerify(VERIFY_CONTEXT);
         return getChild(index);
@@ -122,7 +127,7 @@ void Tree<T>::setValue(T _value) {
 
 template<class T>
 Tree<T> *Tree<T>::getRoot() {
-    if (parent == (Tree<T>*)ROOT_PARENT) {
+    if (isRoot()) {
         return this;
     } else {
         return getParent()->getRoot();
@@ -130,13 +135,18 @@ Tree<T> *Tree<T>::getRoot() {
 }
 
 template<class T>
+bool Tree<T>::isRoot() {
+    return getParent() == (Tree<T>*)ROOT_PARENT;
+}
+
+template<class T>
 Tree<T>** Tree<T>::preorder(Tree<T> **sequence) {
     assert(this);
     sequence++[0] = this;
-    if (getChild(LEFT_CHILD) != (Tree<T>*)NIL) {
+    if (!childIsEmpty(LEFT_CHILD)) {
         sequence = getChild(LEFT_CHILD)->preorder(sequence);
     }
-    if (getChild(RIGHT_CHILD) != (Tree<T>*)NIL) {
+    if (!childIsEmpty(RIGHT_CHILD)) {
         sequence = getChild(RIGHT_CHILD)->preorder(sequence);
     }
     return sequence;
@@ -145,11 +155,11 @@ Tree<T>** Tree<T>::preorder(Tree<T> **sequence) {
 template<class T>
 Tree<T> **Tree<T>::inorder(Tree<T> **sequence) {
     assert(this);
-    if (getChild(LEFT_CHILD) != (Tree<T>*)NIL) {
+    if (!childIsEmpty(LEFT_CHILD)) {
         sequence = getChild(LEFT_CHILD)->inorder(sequence);
     }
     sequence++[0] = this;
-    if (getChild(RIGHT_CHILD) != (Tree<T>*)NIL) {
+    if (!childIsEmpty(RIGHT_CHILD)) {
         sequence = getChild(RIGHT_CHILD)->inorder(sequence);
     }
     return sequence;
@@ -158,10 +168,10 @@ Tree<T> **Tree<T>::inorder(Tree<T> **sequence) {
 template<class T>
 Tree<T> **Tree<T>::postorder(Tree<T> **sequence) {
     assert(this);
-    if (getChild(LEFT_CHILD) != (Tree<T>*)NIL) {
+    if (!childIsEmpty(LEFT_CHILD)) {
         sequence = getChild(LEFT_CHILD)->postorder(sequence);
     }
-    if (getChild(RIGHT_CHILD) != (Tree<T>*)NIL) {
+    if (!childIsEmpty(RIGHT_CHILD)) {
         sequence = getChild(RIGHT_CHILD)->postorder(sequence);
     }
     sequence++[0] = this;
@@ -172,13 +182,13 @@ template<class T>
 Tree<T>* Tree<T>::put(T _value) {
     treeVerify(VERIFY_CONTEXT);
     if (_value < this->value) {
-        if (getChild(LEFT_CHILD) == nullptr) {
+        if (childIsEmpty(LEFT_CHILD)) {
             return growChild(LEFT_CHILD, _value);
         } else {
             return getChild(LEFT_CHILD)->put(_value);
         }
     } else /*if (_value >= this->value)*/{
-        if (getChild(RIGHT_CHILD) == nullptr) {
+        if (childIsEmpty(RIGHT_CHILD)) {
             return growChild(RIGHT_CHILD, _value);
         } else {
             return getChild(RIGHT_CHILD)->put(_value);
@@ -186,6 +196,11 @@ Tree<T>* Tree<T>::put(T _value) {
     }
 }
 
+template<class T>
+Tree<T> **Tree<T>::allocTree() {
+    Tree<T>** buffer = (Tree<T>**)calloc(getSize(), sizeof(buffer[0]));
+    return buffer;
+}
 
 template<class T>
 void Tree<T>::nodeDump(FILE *log, const char *state, const char *message, const char *filename, const char *function, int line) {
@@ -199,7 +214,7 @@ void Tree<T>::nodeDump(FILE *log, const char *state, const char *message, const 
                  "\t\tsize[%p] = %d\n"
                  "\t\tchildren[%p]\n"
                  "\t\t{\n",
-                 ctime(&now), message, filename, function, line, this, state, parent, (parent == nullptr) ? "ROOT" : "", size, getSize(), children);
+                 ctime(&now), message, filename, function, line, this, state, parent, isRoot() ? "ROOT" : "", size, getSize(), children);
     for (int i = 0; i < NUMBER_OF_CHILDREN; ++i) {
         fprintf(log, "\t\t\t[%d]: %p\n", i, children[i]);
     }
@@ -218,8 +233,8 @@ void Tree<T>::genDot(Tree<T> *node, FILE *file) {
     node->valuePrint(file);
     fprintf(file, " | this\\n%p | parent\\n%p  | {left\\n%p | right\\n%p}} \"];\n\t", node, node->getParent(), node->getChild(LEFT_CHILD), node->getChild(RIGHT_CHILD));
     for (int i = 0; i < NUMBER_OF_CHILDREN; ++i) {
-        if (node->getChild(i) != (Tree<T>*)NIL)
-            fprintf(file, "T%p -> T%p[label = \"%s\"];", node, node->getChild(i), i ? "Нет" : "Да");
+        if (!node->childIsEmpty(i))
+            fprintf(file, "T%p -> T%p[label = \"%s\"];", node, node->getChild(i), i ? "Right" : "Left");
     }
     fprintf(file, "\n\t");
 #endif
@@ -273,11 +288,11 @@ bool Tree<T>::treeVerify(const char filename[], const char function[], int line)
     TREE_ASSERT(children != nullptr, Children pointer is NULL)
     TREE_ASSERT(size != nullptr, size pointer is NULL)
     TREE_ASSERT(getSize() > 0, incorrect size)
-    if (getChild(LEFT_CHILD != (Tree<T>*)NIL)) {
+    if (!childIsEmpty(LEFT_CHILD)) {
         TREE_ASSERT(getChild(LEFT_CHILD)->value < value, Left child bigger then parent)
         TREE_ASSERT(getChild(LEFT_CHILD)->getSize() == getSize(), Child size variable mismatch)
     }
-    if (getChild(RIGHT_CHILD) != (Tree<T>*)NIL) {
+    if (!childIsEmpty(RIGHT_CHILD)) {
         TREE_ASSERT(getChild(RIGHT_CHILD)->value >= value, Right child less then parent)
         TREE_ASSERT(getChild(RIGHT_CHILD)->getSize() == getSize(), Child size variable mismatch)
     }
