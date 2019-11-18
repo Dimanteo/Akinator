@@ -1,7 +1,6 @@
 #include <windows.h>
 #include <cmath>
 
-#define OK_DUMP
 #include "Tree_t\Tree.cpp"
 #include "My_Headers\txt_files.h"
 
@@ -12,7 +11,14 @@ const char END_SEPARATOR = '}';
 const char VALUE_SEPARATOR[] = "\"";
 const char YES[] = "Y";
 const char NO[] = "N";
-const char ANSWER_FORMAT[] = "%1s";
+const char COMMANDS_LIST[] = "-play : otgadat cheloveka\n"
+                           "-diff <name1> <name2> : sravnit name1 s name2\n"
+                           "-what <name> : opredeleniye name\n"
+                           "-graph <file> : vivesti graph dereva v file\n"
+                           "-show : vivesti derevo v console\n"
+                           "-save : sohranit derevo\n"
+                           "-q : quit\n"
+                           "-h : help\n";
 
 const int TRIES = 20;
 const size_t ANSWER_SIZE = 4000;
@@ -30,9 +36,8 @@ bool operator<(Phrase a, Phrase b) {
     return true;
 }
 
-//Имена фалов с базой данных
+//Имена файлов с базой данных
 const char DATA_BASE_INPUT[] = "Test.txt";
-const char DATA_BASE_OUTPUT[] = "AUTO_GEN_DATABASE.txt";
 
 
 //Специализация методов класса, для корректной работы с фразами.
@@ -67,11 +72,11 @@ Tree<Phrase>* parse(char** buff);
 
 void printDatabase(Tree<Phrase>* node, FILE* stream);
 
-void play (Tree<Phrase>* akinator, FILE* in, FILE* out);
+bool play (Tree<Phrase>* akinator, FILE* in, FILE* out);
 
-bool findCollision(Tree<Phrase> *akinator, const char *phrase, FILE *in, FILE* out);
+bool findCollision(Tree<Phrase> *akinator, const char *phrase, FILE* out);
 
-void newAnswer(Tree<Phrase>* mistake, FILE* in, FILE* out);
+bool newAnswer(Tree<Phrase>* mistake, FILE* in, FILE* out);
 
 char *definition(Tree<Phrase> **path, size_t num);
 
@@ -81,18 +86,108 @@ Tree<Phrase>** getPath(Tree<Phrase>* node, size_t* num);
 
 void compare(Tree<Phrase>* akinator, FILE* in, FILE* out);
 
-int main() {
-    FILE* log = fopen(TREE_LOG_NAME, "wb"); //clearing log file
-    fclose(log);
+bool handlerYesNo(FILE* in, FILE* out);
 
+void start(Tree<Phrase>* akinator, FILE* in, FILE* out);
+
+void save(Tree<Phrase>* akinator);
+
+int main() {
     char* buffer = nullptr;
     Tree<Phrase>* akinator = parse(&buffer);
 
-    compare(akinator, stdin, stdout);
+    start(akinator, stdin, stdout);
 
     delete (akinator);
     free(buffer);
     return 0;
+}
+
+bool handlerYesNo(FILE* in, FILE* out) {
+    fprintf(out, "Y - yes, N - no\n");
+    char answer[ANSWER_SIZE] = " ";
+    for (int i = 0; i < TRIES; ++i) {
+        fscanf(in, "%s", answer);
+        if (strcmp(answer, YES) == 0) {
+            return true;
+        }
+        if (strcmp(answer, NO) == 0) {
+            return false;
+        }
+        fprintf(out, "Ne mogu ponyat otvet. Vvedite eshe raz:\n");
+    }
+    //Блок обработки ошибок
+    fprintf(out, "Ne hotite po horoshemu, budet po plohomu...\nInitializing Skynet = new Task->Kill_All_Humans\n");
+    abort();
+}
+
+void start(Tree<Phrase>* akinator, FILE* in, FILE* out) {
+    fprintf(out, "Privet, ya akinator.\n %s", COMMANDS_LIST);
+    bool rak_na_gore_ne_svistnet = true, DBchanged = false;
+    while (rak_na_gore_ne_svistnet) {
+        char token[3] = "";
+        int read = fscanf(in, "%s", token);
+        if (read == 0) {
+            fprintf(out, "Nepravilnaya comanda. Vvedite -h chtoby uvidet spisok comand\n");
+            continue;
+        }
+        if (strcmp(token, "-h") == 0) {
+            fprintf(out, "%s", COMMANDS_LIST);
+            continue;
+        }
+        if (strcmp(token, "-play") == 0) {
+            DBchanged = play(akinator, in, out);
+            continue;
+        }
+        if (strcmp(token, "-q") == 0) {
+            if (DBchanged) {
+                fprintf(out, "Baza dannih izmenilas. Sohranit noviye otvety?\n");
+                if (handlerYesNo(in, out)){
+                    save(akinator);
+                }
+            }
+            break;
+        }
+        if (strcmp(token, "-graph") == 0) {
+            char arg[ANSWER_SIZE] = "";
+            fscanf(in, "%s", arg);
+            Tree<Phrase>** seq = akinator->allocTree();
+            akinator->inorder(seq);
+            akinator->graphDump(arg, seq);
+            free(seq);
+            continue;
+        }
+        if (strcmp(token, "-what") == 0) {
+            char arg[ANSWER_SIZE] = "";
+            fscanf(in, "%s", arg);
+            Tree<Phrase>* node = seek(akinator, arg);
+            if (node != nullptr) {
+                size_t size = 0;
+                Tree<Phrase>** path = getPath(node, &size);
+                char* answer = definition(path, size);
+                fprintf(out, "%s\n", answer);
+                free(answer);
+                continue;
+            } else {
+                fprintf(out, "Ya ne znau %s\n", arg);
+                continue;
+            }
+        }
+        if (strcmp(token, "-show") == 0) {
+            printDatabase(akinator, stdout);
+            printf("\n");
+            continue;
+        }
+        if (strcmp(token, "-diff") == 0) {
+            compare(akinator, in, out);
+            fprintf(out, "\n");
+            continue;
+        }
+        if (strcmp(token, "-save") == 0) {
+            save(akinator);
+            continue;
+        }
+    }
 }
 
 Tree<Phrase>* parse(char** buff) {
@@ -104,7 +199,7 @@ Tree<Phrase>* parse(char** buff) {
     return node;
 }
 
-char *readNode(char *ptr, Tree<Phrase> *node) { //format { "quest" { "answer" }{ "answer" }}   //RIGHT - no, LEFT - YES
+char *readNode(char *ptr, Tree<Phrase> *node) { //format { "quest?" { "YES" }{ "NO" }}
     assert(node);
     assert(ptr);
     ptr = strchr(ptr, *VALUE_SEPARATOR);
@@ -137,80 +232,63 @@ void printDatabase(Tree<Phrase>* node, FILE *stream) {
     fprintf(stream, "%c", END_SEPARATOR);
 }
 
-void newAnswer (Tree<Phrase>* mistake, FILE* in, FILE* out) {
+bool newAnswer (Tree<Phrase>* mistake, FILE* in, FILE* out) {
     fprintf(out, "A kakov pravilniy otvet?\n");
     char correct[ANSWER_SIZE] = "";
-    fscanf(in, "%s", correct);
+    fflush(in);
+    fgets(correct, ANSWER_SIZE, in);
+    size_t correct_len = strlen(correct);
+    correct[correct_len - 1] = '\0';
 
-    if (findCollision(mistake, correct, in, out)) {
-        return;
+    if (findCollision(mistake, correct, out)) {
+        return false;
     }
 
     fprintf(out, "Seriously? Chem %s otlichaetsya ot ", correct);
     mistake->valuePrint(out);
     fprintf(out, "\n");
     char question[ANSWER_SIZE] = "";
-    fscanf(in, "%s", question);
+    fflush(in);
+    fgets(question, ANSWER_SIZE, in);
     size_t question_len = strlen(question);
 
-    char* fit_correct = (char*)calloc(strlen(correct) + 1, sizeof(fit_correct[0]));
+    char* fit_correct = (char*)calloc(correct_len, sizeof(fit_correct[0]));
     strcpy(fit_correct, correct);
-    char* fit_question = (char*)calloc(question_len + 2, sizeof(fit_question[0]));
+    char* fit_question = (char*)calloc(question_len + 1, sizeof(fit_question[0]));
     strcpy(fit_question, question);
-    fit_question[question_len] = '?';
+    fit_question[question_len - 1] = '?';
 
     mistake->growChild(LEFT_CHILD, {fit_correct, true});
     mistake->growChild(RIGHT_CHILD, {mistake->getValue().phrase, mistake->getValue().allocated});
     mistake->setValue({fit_question, true});
-    fprintf(out, "OK, ya zapomnu.");
+    fprintf(out, "OK, ya zapomnu.\n");
+    return true;
 }
 
-void play (Tree<Phrase>* akinator, FILE* in, FILE* out) {
+bool play (Tree<Phrase>* akinator, FILE* in, FILE* out) {
     //Если ответ найден
     if (akinator->childIsEmpty(LEFT_CHILD) && akinator->childIsEmpty(RIGHT_CHILD)) {
         fprintf(out, "Moy otvet:\n ");
         akinator->valuePrint(out);
         fprintf(out, "\nYa ugadal?\n");
-        char answer[ANSWER_SIZE] = " ";
-        for (int i = 0; i < TRIES; ++i) {
-            fscanf(in, ANSWER_FORMAT, answer);
-            if (strcmp(answer, YES) == 0) {
-                return;
-            }
-            if (strcmp(answer, NO) == 0) {
-                newAnswer(akinator, in, out);
-                return;
-            }
-            fprintf(out, "%d Ne mogu ponyat otvet. Vvedite eshe raz:\n", i);
+        if (handlerYesNo(in, out)) {
+            return false;
+        } else {
+            return newAnswer(akinator, in, out);
         }
-        //Блок обработки ошибок
-        fprintf(out, "Ne hotite po horoshemu, budet po plohomu...\nInitializing Skynet = new Task->Kill_All_Humans\n");
-        abort();
     }
     //Если в узле вопрос
     akinator->valuePrint(out);
     fprintf(out, "\n");
-    char answer[ANSWER_SIZE] = " ";
-    for (int i = 0; i < TRIES; ++i) {
-        fscanf(in, "%s", answer);
-        if (strcmp(answer, YES) == 0) {
-            play(akinator->getChild(LEFT_CHILD), in, out);
-            return;
-        }
-        if (strcmp(answer, NO) == 0) {
-            play(akinator->getChild(RIGHT_CHILD), in, out);
-            return;
-        }
-        fprintf(out, "Ne mogu ponyat otvet. Vvedite eshe raz:\n");
+    if (handlerYesNo(in, out)) {
+        return play(akinator->getChild(LEFT_CHILD), in, out);
+    } else {
+        return play(akinator->getChild(RIGHT_CHILD), in, out);
     }
-    //Блок обработки ошибок
-    fprintf(out, "Ne hotite po horoshemu, budet po plohomu...\nInitializing Skynet = new Task->Kill_All_Humans\n");
-    abort();
 }
 
-bool findCollision(Tree<Phrase> *akinator, const char *phrase, FILE *in, FILE* out) {
+bool findCollision(Tree<Phrase> *akinator, const char *phrase, FILE* out) {
     assert(akinator);
-    assert(in);
     assert(out);
 
     Tree<Phrase>* copy = seek(akinator->getRoot(), phrase);
@@ -291,7 +369,6 @@ Tree<Phrase>** getPath(Tree<Phrase>* node, size_t* num) {
 }
 
 void compare(Tree<Phrase> *akinator, FILE *in, FILE *out) {
-    fprintf(out, "Chto mne sravnit: \n");
     char in_first[ANSWER_SIZE] = "";
     char in_second[ANSWER_SIZE] = "";
     fscanf(in, "%s %s", in_first, in_second);
@@ -340,4 +417,9 @@ void compare(Tree<Phrase> *akinator, FILE *in, FILE *out) {
     }
     free(path1);
     free(path2);
+}
+
+void save(Tree<Phrase> *akinator) {
+    FILE* file = fopen(DATA_BASE_INPUT, "wb");
+    printDatabase(akinator, file);
 }
