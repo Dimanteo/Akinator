@@ -1,8 +1,8 @@
-#include <windows.h>
 #include <cmath>
+#include "Tree_t/Tree.cpp"
+#include "txt_files.h"
 
-#include "Tree_t\Tree.cpp"
-#include "My_Headers\txt_files.h"
+
 
 //Переменные формата
 #define MIPT_FORMAT " \"%[^\"]\" "
@@ -11,14 +11,14 @@ const char END_SEPARATOR = '}';
 const char VALUE_SEPARATOR[] = "\"";
 const char YES[] = "Y";
 const char NO[] = "N";
-const char COMMANDS_LIST[] = "-play : otgadat cheloveka\n"
-                           "-diff <name1> <name2> : sravnit name1 s name2\n"
-                           "-what <name> : opredeleniye name\n"
-                           "-graph <file> : vivesti graph dereva v file\n"
-                           "-show : vivesti derevo v console\n"
-                           "-save : sohranit derevo\n"
-                           "-q : quit\n"
-                           "-h : help\n";
+const char COMMANDS_LIST[] = "-play : отгадывать\n"
+                           "-diff <name1> <name2> : сравнить name1 с name2\n"
+                           "-what <name> : дать определение name\n"
+                           "-graph <file> : вывести граф дерева в файл\n"
+                           "-show : вывести дерево в консоль\n"
+                           "-save : сохранить дерево\n"
+                           "-q : выход\n"
+                           "-h : помощь\n";
 
 const int TRIES = 20;
 const size_t ANSWER_SIZE = 4000;
@@ -37,7 +37,7 @@ bool operator<(Phrase a, Phrase b) {
 }
 
 //Имена файлов с базой данных
-const char DATA_BASE_INPUT[] = "Test.txt";
+const char DATA_BASE_INPUT[] = "DBase.txt";
 
 
 //Специализация методов класса, для корректной работы с фразами.
@@ -65,7 +65,7 @@ void Tree<Phrase>::genDot(Tree<Phrase> *node, FILE *file) {
 }
 
 
-//Методы акинтаора
+//Методы акинатора
 char* readNode(char* ptr, Tree<Phrase>* node);
 
 Tree<Phrase>* parse(char** buff);
@@ -104,7 +104,7 @@ int main() {
 }
 
 bool handlerYesNo(FILE* in, FILE* out) {
-    fprintf(out, "Y - yes, N - no\n");
+    fprintf(out, "Y - да, N - нет\n");
     char answer[ANSWER_SIZE] = " ";
     for (int i = 0; i < TRIES; ++i) {
         fscanf(in, "%s", answer);
@@ -114,21 +114,21 @@ bool handlerYesNo(FILE* in, FILE* out) {
         if (strcmp(answer, NO) == 0) {
             return false;
         }
-        fprintf(out, "Ne mogu ponyat otvet. Vvedite eshe raz:\n");
+        fprintf(out, "Не понимаю ваш ответ. Введите еще раз:\n");
     }
     //Блок обработки ошибок
-    fprintf(out, "Ne hotite po horoshemu, budet po plohomu...\nInitializing Skynet = new Task->Kill_All_Humans\n");
+    fprintf(out, "Не хотите по хорошему, будет по плохому...\nInitializing Skynet = new Task->Kill_All_Humans\n");
     abort();
 }
 
 void start(Tree<Phrase>* akinator, FILE* in, FILE* out) {
-    fprintf(out, "Privet, ya akinator.\n %s", COMMANDS_LIST);
+    fprintf(out, "Привет, я Акинатор.\n %s", COMMANDS_LIST);
     bool rak_na_gore_ne_svistnet = true, DBchanged = false;
     while (rak_na_gore_ne_svistnet) {
         char token[3] = "";
         int read = fscanf(in, "%s", token);
         if (read == 0) {
-            fprintf(out, "Nepravilnaya comanda. Vvedite -h chtoby uvidet spisok comand\n");
+            fprintf(out, "Неправильная команда. Введите -h чтобы увидеть список команд\n");
             continue;
         }
         if (strcmp(token, "-h") == 0) {
@@ -141,7 +141,7 @@ void start(Tree<Phrase>* akinator, FILE* in, FILE* out) {
         }
         if (strcmp(token, "-q") == 0) {
             if (DBchanged) {
-                fprintf(out, "Baza dannih izmenilas. Sohranit noviye otvety?\n");
+                fprintf(out, "База данных изменилась. Сохранить новые ответы?\n");
                 if (handlerYesNo(in, out)){
                     save(akinator);
                 }
@@ -169,7 +169,7 @@ void start(Tree<Phrase>* akinator, FILE* in, FILE* out) {
                 free(answer);
                 continue;
             } else {
-                fprintf(out, "Ya ne znau %s\n", arg);
+                fprintf(out, "Я не знаю %s\n", arg);
                 continue;
             }
         }
@@ -187,6 +187,7 @@ void start(Tree<Phrase>* akinator, FILE* in, FILE* out) {
             save(akinator);
             continue;
         }
+        fprintf(out, "Неправильная команда. Введите -h чтобы увидеть список команд\n");
     }
 }
 
@@ -233,9 +234,10 @@ void printDatabase(Tree<Phrase>* node, FILE *stream) {
 }
 
 bool newAnswer (Tree<Phrase>* mistake, FILE* in, FILE* out) {
-    fprintf(out, "A kakov pravilniy otvet?\n");
+    fprintf(out, "А каков правильный ответ?\n");
     char correct[ANSWER_SIZE] = "";
     fflush(in);
+    fscanf(in, " ");
     fgets(correct, ANSWER_SIZE, in);
     size_t correct_len = strlen(correct);
     correct[correct_len - 1] = '\0';
@@ -244,11 +246,12 @@ bool newAnswer (Tree<Phrase>* mistake, FILE* in, FILE* out) {
         return false;
     }
 
-    fprintf(out, "Seriously? Chem %s otlichaetsya ot ", correct);
+    fprintf(out, "Что правда? Чем %s отличается от ", correct);
     mistake->valuePrint(out);
     fprintf(out, "\n");
     char question[ANSWER_SIZE] = "";
     fflush(in);
+    fscanf(in, " ");
     fgets(question, ANSWER_SIZE, in);
     size_t question_len = strlen(question);
 
@@ -261,16 +264,16 @@ bool newAnswer (Tree<Phrase>* mistake, FILE* in, FILE* out) {
     mistake->growChild(LEFT_CHILD, {fit_correct, true});
     mistake->growChild(RIGHT_CHILD, {mistake->getValue().phrase, mistake->getValue().allocated});
     mistake->setValue({fit_question, true});
-    fprintf(out, "OK, ya zapomnu.\n");
+    fprintf(out, "OK, я запомню.\n");
     return true;
 }
 
 bool play (Tree<Phrase>* akinator, FILE* in, FILE* out) {
     //Если ответ найден
     if (akinator->childIsEmpty(LEFT_CHILD) && akinator->childIsEmpty(RIGHT_CHILD)) {
-        fprintf(out, "Moy otvet:\n ");
+        fprintf(out, "Мой ответ:\n ");
         akinator->valuePrint(out);
-        fprintf(out, "\nYa ugadal?\n");
+        fprintf(out, "\nЯ угадал?\n");
         if (handlerYesNo(in, out)) {
             return false;
         } else {
@@ -297,7 +300,7 @@ bool findCollision(Tree<Phrase> *akinator, const char *phrase, FILE* out) {
         Tree<Phrase>** path = getPath(copy, &size);
         char* def = definition(path, size);
         free(path);
-        fprintf(out, "Ne pravda. Ya uzhe znau %s\n%s.", phrase, def);
+        fprintf(out, "Не правда. Я уже знаю %s\n%s.", phrase, def);
         free(def);
         return true;
     }
@@ -315,10 +318,10 @@ char *definition(Tree<Phrase> **path, size_t num) {
     char* output = (char*) calloc(len + 2, sizeof(output[0]));
     assert(output);
     strcpy(output, path[num - 1]->getValue().phrase);
-    strcat(output, " eto ");
+    strcat(output, " это ");
     for (int i = 0; i < num - 1; ++i) {
         if (path[i]->getChild(RIGHT_CHILD) == path[i + 1]) {
-            strcat(output, "ne ");
+            strcat(output, "не ");
         }
         path[i]->getValue().phrase[strlen(path[i]->getValue().phrase) - 1] = ' ';
         strcat(output, path[i]->getValue().phrase);
@@ -374,12 +377,12 @@ void compare(Tree<Phrase> *akinator, FILE *in, FILE *out) {
     fscanf(in, "%s %s", in_first, in_second);
     Tree<Phrase>* first = seek(akinator, in_first);
     if (first == nullptr) {
-        fprintf(out, "Ya ne znau %s", in_first);
+        fprintf(out, "Я не знаю %s", in_first);
         return;
     }
     Tree<Phrase>* second = seek(akinator, in_second);
     if (second == nullptr) {
-        fprintf(out, "Ya ne znau %s", in_second);
+        fprintf(out, "Я не знаю %s", in_second);
         return;
     }
     size_t size1 = 0, size2 = 0;
@@ -389,28 +392,28 @@ void compare(Tree<Phrase> *akinator, FILE *in, FILE *out) {
     //общее поддерево
     int index = 0;
     if (path1[1] == path2[1]) {
-        fprintf(out, "%s and %s pohozhi tem, chto oni oba", first->getValue().phrase, second->getValue().phrase);
+        fprintf(out, "%s и %s похожи тем, что они оба", first->getValue().phrase, second->getValue().phrase);
         for (; path1[index + 1] == path2[index + 1]; ++index) {
             if (path1[index]->getChild(RIGHT_CHILD) == path1[index + 1] &&
                 path2[index]->getChild(RIGHT_CHILD) == path2[index + 1])
-                fprintf(out, " ne");
+                fprintf(out, " не");
             fprintf(out, " %s", path1[index]->getValue().phrase);
         }
-        fprintf(out, ", no ");
+        fprintf(out, ", но ");
     }
     //личные поддеревья
     fprintf(out, "%s", first->getValue().phrase);
     for (int i = index; i < size1 - 1; ++i) {
         if (path1[i]->getChild(RIGHT_CHILD) == path1[i + 1])
-            fprintf(out, " ne");
+            fprintf(out, " не");
         path1[i]->getValue().phrase[strlen(path1[i]->getValue().phrase) - 1] = ' ';
         fprintf(out, " %s", path1[i]->getValue().phrase);
         path1[i]->getValue().phrase[strlen(path1[i]->getValue().phrase) - 1] = '?';
     }
-    fprintf(out, ", a %s", second->getValue().phrase);
+    fprintf(out, ", а %s", second->getValue().phrase);
     for (int i = index; i < size2 - 1; ++i) {
         if (path2[i]->getChild(RIGHT_CHILD) == path2[i + 1])
-            fprintf(out, " ne");
+            fprintf(out, " не");
         path2[i]->getValue().phrase[strlen(path2[i]->getValue().phrase) - 1] = ' ';
         fprintf(out, " %s", path2[i]->getValue().phrase);
         path2[i]->getValue().phrase[strlen(path2[i]->getValue().phrase) - 1] = '?';
@@ -422,4 +425,5 @@ void compare(Tree<Phrase> *akinator, FILE *in, FILE *out) {
 void save(Tree<Phrase> *akinator) {
     FILE* file = fopen(DATA_BASE_INPUT, "wb");
     printDatabase(akinator, file);
+    fclose(file);
 }
